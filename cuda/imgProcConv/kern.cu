@@ -1,6 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Kernel configuration
 ////////////////////////////////////////////////////////////////////////////////
+/*
 #define KERNEL_RADIUS 8
 #define      KERNEL_W (2 * KERNEL_RADIUS + 1)
 __device__ __constant__ float d_Kernel[KERNEL_W];
@@ -16,7 +17,22 @@ __device__ __constant__ float d_Kernel[KERNEL_W];
 // are coalesced in convolutionColumnGPU()
 #define COLUMN_TILE_W 16
 #define COLUMN_TILE_H 48
+*/
+#define KERNEL_RADIUS 1
+#define      KERNEL_W (2 * KERNEL_RADIUS + 1)
+__device__ __constant__ float d_Kernel[KERNEL_W];
 
+// Assuming ROW_TILE_W, KERNEL_RADIUS_ALIGNED and dataW 
+// are multiples of maximum coalescable read/write size,
+// all global memory operations are coalesced in convolutionRowGPU()
+#define            ROW_TILE_W 128
+#define KERNEL_RADIUS_ALIGNED 16
+
+// Assuming COLUMN_TILE_W and dataW are multiples
+// of maximum coalescable read/write size, all global memory operations 
+// are coalesced in convolutionColumnGPU()
+#define COLUMN_TILE_W 16
+#define COLUMN_TILE_H 48
 
 
 ////////////////////////////////////////////////////////////////////////////////

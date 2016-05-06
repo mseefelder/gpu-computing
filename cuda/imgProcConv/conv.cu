@@ -46,7 +46,7 @@ const int KERNEL_SIZE = KERNEL_W * sizeof(float);
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
 ////////////////////////////////////////////////////////////////////////////////
-int convolve(/*params*/){
+float* convolve(float* img){
     float
         *h_Kernel,
         *h_DataA,
@@ -76,17 +76,20 @@ int convolve(/*params*/){
         cudaMalloc( (void **)&d_DataB, DATA_SIZE);
 
         float kernelSum = 0;
-        for(i = 0; i < KERNEL_W; i++){
-            float dist = (float)(i - KERNEL_RADIUS) / (float)KERNEL_RADIUS;
-            h_Kernel[i] = expf(- dist * dist / 2);
-            kernelSum += h_Kernel[i];
+        for(i = -1; i < 2; i++){
+            h_Kernel[i+1] = 1.0*i;
         }
-        for(i = 0; i < KERNEL_W; i++)
-            h_Kernel[i] /= kernelSum;
+        //for(i = 0; i < KERNEL_W; i++){
+            //float dist = (float)(i - KERNEL_RADIUS) / (float)KERNEL_RADIUS;
+            //h_Kernel[i] = expf(- dist * dist / 2);
+            //kernelSum += h_Kernel[i];
+        //}
+        //for(i = 0; i < KERNEL_W; i++)
+        //    h_Kernel[i] /= kernelSum;
 
         srand((int)time(NULL));
         for(i = 0; i < DATA_W * DATA_H; i++)
-            h_DataA[i] = (float)rand() / (float)RAND_MAX;
+            h_DataA[i] = img[i];//(float)rand() / (float)RAND_MAX;
 
         cudaMemcpyToSymbol(d_Kernel, h_Kernel, KERNEL_SIZE);
         cudaMemcpy(d_DataA, h_DataA, DATA_SIZE, cudaMemcpyHostToDevice);
@@ -97,6 +100,7 @@ int convolve(/*params*/){
     dim3 threadBlockRows(KERNEL_RADIUS_ALIGNED + ROW_TILE_W + KERNEL_RADIUS);
     dim3 threadBlockColumns(COLUMN_TILE_W, 8);
 
+/**/
     printf("GPU convolution...\n");
 
         cudaThreadSynchronize();
@@ -122,17 +126,17 @@ int convolve(/*params*/){
     //CUT_SAFE_CALL(cutStopTimer(hTimer));
     //gpuTime = cutGetTimerValue(hTimer);
     //printf("GPU convolution time : %f msec //%f Mpixels/sec\n", gpuTime, 1e-6 * DATA_W * DATA_H / (gpuTime * 0.001));
-
+/**/
     printf("Reading back GPU results...\n");
         cudaMemcpy(h_ResultGPU, d_DataA, DATA_SIZE, cudaMemcpyDeviceToHost);
 
     printf("Shutting down...\n");
         cudaFree(d_DataB);
         cudaFree(d_DataA);
-        free(h_ResultGPU);
+        //free(h_ResultGPU);
         free(h_DataB);
         free(h_DataA);
         free(h_Kernel);
 
-    return 1;
+    return h_ResultGPU;
 }

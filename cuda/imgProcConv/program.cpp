@@ -1,8 +1,8 @@
 #include <iostream>
 #include "CImg.h"
 
-float* t (float *f, int x, int y, int s);
-int convolve(/*params*/);
+//float* t (float *f, int x, int y, int s);
+float* convolve(float* img);
 
 int main(int argc, char* argv[]) {
 
@@ -28,14 +28,32 @@ int main(int argc, char* argv[]) {
   }
 
   int size = img1.width()*img1.height()*img1.spectrum();
+
+  int sizeBW = img1.width()*img1.height();
+  float bW[sizeBW];
+
+  int s = img1.spectrum();
+  float *fPointer = img1.data();
+  for (int i = 0; i < sizeBW; ++i)
+  {
+    float pix = .0;
+    for (int j = 0; j < s; ++j)
+    {
+      pix += fPointer[i+(sizeBW*j)];
+    }
+    pix /= s*1.0;
+    bW[i] = pix;
+  }
+
   //float *data = new float[size];
   //for (int i = 0; i < size; ++i)
   //{
   //  data[i] = img1.data()[i];
   //}
-  float *result = t(img1.data(), img1.width(), img1.height(), img1.spectrum());
+  
+  float *result = convolve(bW);
 
-  cimg_library::CImg<float> imgFinal(result, img1.width(), img1.height(), 1, img1.spectrum());
+  cimg_library::CImg<float> imgFinal(result, img1.width(), img1.height(), 1, 1);
 
   //display final image
   /**/
