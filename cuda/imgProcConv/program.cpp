@@ -28,13 +28,16 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  int size = img1.width()*img1.height()*img1.spectrum();
+  std::cout<<"Opened file"<<std::endl;
 
-  int sizeBW = img1.width()*img1.height();
-  float bW[sizeBW];
+  //int size = img1.width()*img1.height()*img1.spectrum();
+
+  long long sizeBW = img1.width()*img1.height();
+  float *bW = new float[sizeBW];
 
   int s = img1.spectrum();
   float *fPointer = img1.data();
+  #pragma omp parallel for
   for (int i = 0; i < sizeBW; ++i)
   {
     float pix = .0;
@@ -46,13 +49,14 @@ int main(int argc, char* argv[]) {
     bW[i] = pix;
   }
 
+  /**/
   //float *data = new float[size];
   //for (int i = 0; i < size; ++i)
   //{
   //  data[i] = img1.data()[i];
   //}
   
-  float result[sizeBW];
+  float *result = new float[sizeBW];
   calculateGradient(result, bW, img1.width(), img1.height());
 
   //float reorganizedResult[sizeBW];
@@ -63,6 +67,10 @@ int main(int argc, char* argv[]) {
   //}
 
   cimg_library::CImg<float> imgFinal(result, img1.width(), img1.height(), 1, 1);
+  imgFinal.normalize(imgFinal.min()*10, imgFinal.max()*10);
+  imgFinal.save_png("result.png");
+  /**/
+  //cimg_library::CImg<float> imgFinal(bW, img1.width(), img1.height(), 1, 1);
 
   //display final image
   /**/
@@ -70,6 +78,9 @@ int main(int argc, char* argv[]) {
   while (!img1_disp.is_closed()) { 
   }
   /**/
+
+  delete [] bW;
+  delete [] result;
 
   return 0;
 }
