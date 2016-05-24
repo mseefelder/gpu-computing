@@ -1,8 +1,9 @@
 #include <iostream>
+#include <omp.h>
 #include "CImg.h"
 
 //float* t (float *f, int x, int y, int s);
-float* convolve(float* img);
+void calculateGradient(float* h_ResultGPU, float* img, int imgWidth, int imgHeight);
 
 int main(int argc, char* argv[]) {
 
@@ -51,7 +52,15 @@ int main(int argc, char* argv[]) {
   //  data[i] = img1.data()[i];
   //}
   
-  float *result = convolve(bW);
+  float result[sizeBW];
+  calculateGradient(result, bW, img1.width(), img1.height());
+
+  //float reorganizedResult[sizeBW];
+  //for (int i = 0; i < sizeBW; i++)
+  //{
+  //  reorganizedResult[i]        = result[i*2];
+  //  reorganizedResult[i+sizeBW] = result[(i*2)+1];
+  //}
 
   cimg_library::CImg<float> imgFinal(result, img1.width(), img1.height(), 1, 1);
 

@@ -3,6 +3,14 @@
 #include <cstring>
 
 ////////////////////////////////////////////////////////////////////////////////
+// Tracker state variables and pointers
+////////////////////////////////////////////////////////////////////////////////
+//Have the pointers been initialized?
+bool trackerPointers = false;
+
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Common host and device functions
 ////////////////////////////////////////////////////////////////////////////////
 //Round a / b to nearest higher integer value
@@ -29,7 +37,8 @@ int iAlignDown(int a, int b){
 // GPU convolution
 ////////////////////////////////////////////////////////////////////////////////
 //kernels
-#include "kern.cu"
+#include "gradkern.cu"
+#include "convkern.cu"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Data configuration
@@ -41,109 +50,91 @@ int iAlignDown(int a, int b){
 //const int      DATA_H = 256;
 
 //const int   DATA_SIZE = DATA_W * DATA_H * sizeof(float);
-//const int KERNEL_SIZE = KERNEL_W * sizeof(float);
+//const int GRADIENT_SIZE = GRADIENT_W * sizeof(float);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
 ////////////////////////////////////////////////////////////////////////////////
-float* convolve(float* img, int imgWidth, int imgHeight){
+void calculateGradient(float* h_ResultGPU, float* img, int imgWidth, int imgHeight){
 
     const int      DATA_W = imgWidth;
     const int      DATA_H = imgHeight;
 
     const int   DATA_SIZE = DATA_W * DATA_H * sizeof(float);
-    const int KERNEL_SIZE = KERNEL_W * sizeof(float);
+    const int GRADIENT_SIZE = GRADIENT_W * sizeof(float);
 
     float
-        *h_Kernel,
-        *h_DataA,
-        *h_DataB,
-        *h_ResultGPU;
+        *h_Gradient,
+        *h_DataA;
 
     float
         *d_DataA,
-        *d_DataB;
+        *d_DataIx,
+        *d_DataIy,
+        *d_DataTemp;
 
     double
         sum_delta, sum_ref, L1norm, gpuTime;
 
     int i;
 
-    //unsigned int hTimer;
-
-    //CUT_SAFE_CALL(cutCreateTimer(&hTimer));
-
     printf("%i x %i\n", DATA_W, DATA_H);
     printf("Initializing data...\n");
-        h_Kernel    = (float *)malloc(KERNEL_SIZE);
+        h_Gradient  = (float *)malloc(GRADIENT_SIZE);
         h_DataA     = (float *)malloc(DATA_SIZE);
-        h_DataB     = (float *)malloc(DATA_SIZE);
-        h_ResultGPU = (float *)malloc(DATA_SIZE);
         cudaMalloc( (void **)&d_DataA, DATA_SIZE);
-        cudaMalloc( (void **)&d_DataB, DATA_SIZE);
+        cudaMalloc( (void **)&d_DataIx, DATA_SIZE);
+        cudaMalloc( (void **)&d_DataIy, DATA_SIZE);
+        cudaMalloc( (void **)&d_DataTemp, DATA_SIZE);
 
         float kernelSum = 0;
-        for(i = -1; i < 2; i++){
-            h_Kernel[i+1] = 1.0*i;
+        for(i = -GRADIENT_RADIUS; i < GRADIENT_RADIUS+1; i++){
+            h_Gradient[i+GRADIENT_RADIUS] = 1.0*i;
         }
-        //for(i = 0; i < KERNEL_W; i++){
-            //float dist = (float)(i - KERNEL_RADIUS) / (float)KERNEL_RADIUS;
-            //h_Kernel[i] = expf(- dist * dist / 2);
-            //kernelSum += h_Kernel[i];
-        //}
-        //for(i = 0; i < KERNEL_W; i++)
-        //    h_Kernel[i] /= kernelSum;
-
-        srand((int)time(NULL));
+        
         for(i = 0; i < DATA_W * DATA_H; i++)
-            h_DataA[i] = img[i];//(float)rand() / (float)RAND_MAX;
+            h_DataA[i] = img[i];
 
-        cudaMemcpyToSymbol(d_Kernel, h_Kernel, KERNEL_SIZE);
+        cudaMemcpyToSymbol(d_Gradient, h_Gradient, GRADIENT_SIZE);
         cudaMemcpy(d_DataA, h_DataA, DATA_SIZE, cudaMemcpyHostToDevice);
 
 
-    dim3 blockGridRows(iDivUp(DATA_W, ROW_TILE_W), DATA_H);
-    dim3 blockGridColumns(iDivUp(DATA_W, COLUMN_TILE_W), iDivUp(DATA_H, COLUMN_TILE_H));
-    dim3 threadBlockRows(KERNEL_RADIUS_ALIGNED + ROW_TILE_W + KERNEL_RADIUS);
-    dim3 threadBlockColumns(COLUMN_TILE_W, 8);
+    dim3 gradBlockGridRows(iDivUp(DATA_W, GRAD_ROW_TILE_W), DATA_H);
+    dim3 gradBlockGridColumns(iDivUp(DATA_W, GRAD_COLUMN_TILE_W), iDivUp(DATA_H, GRAD_COLUMN_TILE_H));
+    dim3 gradThreadBlockRows(GRADIENT_RADIUS_ALIGNED + GRAD_ROW_TILE_W + GRADIENT_RADIUS);
+    dim3 gradThreadBlockColumns(GRAD_COLUMN_TILE_W, 8);
 
 /**/
-    printf("GPU convolution...\n");
+    printf("GPU gradient calculation...\n");
 
         cudaThreadSynchronize();
-        //CUT_SAFE_CALL( cutResetTimer(hTimer) );
-        //CUT_SAFE_CALL( cutStartTimer(hTimer) );
-        convolutionRowGPU<<<blockGridRows, threadBlockRows>>>(
-            d_DataB,
+        gradientRowGPU<<<gradBlockGridRows, gradThreadBlockRows>>>(
+            d_DataIx,
             d_DataA,
             DATA_W,
             DATA_H
         );
 
-        convolutionColumnGPU<<<blockGridColumns, threadBlockColumns>>>(
+        gradientColumnGPU<<<gradBlockGridColumns, gradThreadBlockColumns>>>(
+            d_DataIy,
             d_DataA,
-            d_DataB,
             DATA_W,
             DATA_H,
-            COLUMN_TILE_W * threadBlockColumns.y,
-            DATA_W * threadBlockColumns.y
+            GRAD_COLUMN_TILE_W * gradThreadBlockColumns.y,
+            DATA_W * gradThreadBlockColumns.y
         );
 
     cudaThreadSynchronize();
-    //CUT_SAFE_CALL(cutStopTimer(hTimer));
-    //gpuTime = cutGetTimerValue(hTimer);
-    //printf("GPU convolution time : %f msec //%f Mpixels/sec\n", gpuTime, 1e-6 * DATA_W * DATA_H / (gpuTime * 0.001));
 /**/
     printf("Reading back GPU results...\n");
-        cudaMemcpy(h_ResultGPU, d_DataA, DATA_SIZE, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_ResultGPU, d_DataIx, DATA_SIZE, cudaMemcpyDeviceToHost);
 
     printf("Shutting down...\n");
-        cudaFree(d_DataB);
+        cudaFree(d_DataIx);
+        cudaFree(d_DataIy);
         cudaFree(d_DataA);
-        //free(h_ResultGPU);
-        free(h_DataB);
         free(h_DataA);
-        free(h_Kernel);
+        free(h_Gradient);
 
-    return h_ResultGPU;
+    return;
 }
