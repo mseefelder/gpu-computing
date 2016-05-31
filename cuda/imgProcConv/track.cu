@@ -196,7 +196,7 @@ void calculateGradient(float* h_ResultGPU, float* img, int imgWidth, int imgHeig
     cudaThreadSynchronize();
 /**/
     printf("Reading back GPU results...\n");
-        cudaMemcpy(h_ResultGPU, d_DataIx, DATA_SIZE, cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_ResultGPU, d_DataA, DATA_SIZE, cudaMemcpyDeviceToHost);
 
     printf("Shutting down...\n");
         cudaFree(d_DataIx);
