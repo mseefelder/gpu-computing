@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <tucano.hpp>
+#include <omp.h>
 #include "GLFW/glfw3.h"
 #include "CImg.h"
 #include "glwindow.hpp"
@@ -83,7 +84,8 @@ int main(int argc, char *argv[])
 
 	int s = img1.spectrum();
 	float *fPointer = img1.data();
-	//#pragma omp parallel for
+	
+	#pragma omp parallel for
 	for (int i = 0; i < sizeBW; ++i)
 	{
 		float pix = .0;
@@ -92,7 +94,7 @@ int main(int argc, char *argv[])
 		  pix += fPointer[i+(sizeBW*j)];
 		}
 		pix /= s*1.0;
-		bW[i] = pix;
+		bW[sizeBW-1-i] = pix/255.;
 	}
 
 	GLFWwindow* main_window;
@@ -136,7 +138,7 @@ int main(int argc, char *argv[])
 	{
 		glfwMakeContextCurrent(main_window);
 		glfwSwapBuffers(main_window);
-		glWindow->paintGL();
+		glWindow->paint();
 		glfwPollEvents();
 	}
 	

@@ -20,6 +20,7 @@ public:
     {
     	frameTexture = NULL;
     	initd = false;
+    	hastexture = false;
    	}
 
     ~GLWindow()
@@ -73,7 +74,9 @@ public:
 	    	Tucano::Misc::errorCheckFunc(__FILE__, __LINE__);
 	    }
 
-	    Eigen::Vector2i viewport (viewportSize[0], viewportSize[1]);
+	    viewportSize << width, height;
+
+	    hastexture = false;
     }
 
     virtual void directUpdateFrame(float* frame)
@@ -81,10 +84,15 @@ public:
     	frameTexture->update(frame);
     }
 
+    void gradient()
+    {
+
+    }
+
     /**
      * Repaints screen buffer.
      **/
-    virtual void paintGL()
+    virtual void paint()
     {
 	 	
 		if(!initd)
@@ -95,8 +103,8 @@ public:
 
 		// renders the given image, not that we are setting a fixed viewport that follows the widgets size
 	    // so it may not be scaled correctly with the image's size (just to keep the example simple)
-	    Eigen::Vector2i viewport (viewportSize[0], viewportSize[1]);
-	    rendertexture.renderTexture(*frameTexture, viewport);
+	    //Eigen::Vector2i viewport (viewportSize[0], viewportSize[1]);
+	    rendertexture.renderTexture(*frameTexture, viewportSize);
     }
 
 	Tucano::Texture* texPointer()
@@ -123,6 +131,9 @@ private:
 
     /// has this been initialized?
 	bool initd;
+
+	/// has texture
+	bool hastexture;
 };
 
 #endif // GLWINDOW

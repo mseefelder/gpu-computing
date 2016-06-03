@@ -23,6 +23,15 @@ if(NOT OPENGL_FOUND)
   message(SEND_ERROR "OpenGL not found on your system.")
 endif()
 
+#SET OPENMP
+find_package(OpenMP REQUIRED)
+if(NOT OPENMP_FOUND)
+  message(SEND_ERROR "OpenMP not found on your system.")
+else()
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
 #SET GLFW
 if( WIN32 ) # true if windows (32 and 64 bit)
   set (GLFW_INCLUDE_DIR "NOT-FOUND" CACHE PATH "glfw include directory")
