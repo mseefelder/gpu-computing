@@ -1,0 +1,76 @@
+#version 430
+
+//change in layout as well
+#define GRAD_ROW_TILE_W 128
+#define GRADIENT_RADIUS 1
+#define GRADIENT_RADIUS_ALIGNED 16
+
+uniform sampler2D inputTexture;
+layout (r32f) uniform image2D outputTexture;
+
+uniform int dataW;
+uniform int dataH;
+
+// 128 pixels with radius 1: GRADIENT_RADIUS_ALIGNED+GRAD_ROW_TILE_W+GRADIENT_RADIUS;
+layout (local_size_x = 145, local_size_y = 1, local_size_z = 1) in;
+
+//shared pixel array
+shared float data[GRADIENT_RADIUS + GRAD_ROW_TILE_W + GRADIENT_RADIUS];
+
+void main() {
+    //Current tile and apron limits, relative to row start
+    const int         tileStart = gl_WorkGroupID​.x * GRAD_ROW_TILE_W;
+    const int           tileEnd = tileStart + GRAD_ROW_TILE_W - 1;
+    const int        apronStart = tileStart - GRADIENT_RADIUS;
+    const int          apronEnd = tileEnd   + GRADIENT_RADIUS;
+
+    //Clamp tile and apron limits by image borders
+    const int    tileEndClamped = min(tileEnd, dataW - 1);
+    const int apronStartClamped = max(apronStart, 0);
+    const int   apronEndClamped = min(apronEnd, dataW - 1);
+
+    //Row start index in d_Data[]
+    const int          rowStart = gl_WorkGroupID​.y*dataW;
+
+    //Aligned apron start. Assuming dataW and ROW_TILE_W are multiples 
+    //of half-warp size, rowStart + apronStartAligned is also a 
+    //multiple of half-warp size, thus having proper alignment 
+    //for coalesced d_Data[] read.
+    const int apronStartAligned = tileStart - GRADIENT_RADIUS_ALIGNED;
+
+    const int loadPos = apronStartAligned + gl_LocalInvocationID​.x;
+    
+    //Set the entire data cache contents
+    //Load global memory values, if indices are within the image borders,
+    //or initialize with zeroes otherwise
+    if(loadPos >= apronStart){
+        const int smemPos = loadPos - apronStart;
+
+        data[smemPos] = 
+            ((loadPos >= apronStartClamped) && (loadPos <= apronEndClamped)) ?
+            texelFetch(inputTexture, ivec2(loadPos, rowStart)) : 0;
+            //texelFetch(inputTexture, rowStart + loadPos) : 0;
+    }
+
+    //Ensure the completness of the loading stage
+    //because results, emitted by each thread depend on the data,
+    //loaded by another threads
+    memoryBarrierShared();
+
+    const int writePos = tileStart + gl_LocalInvocationID​.x;
+
+    //Assuming dataW and ROW_TILE_W are multiples of half-warp size,
+    //rowStart + tileStart is also a multiple of half-warp size,
+    //thus having proper alignment for coalesced d_Result[] write.
+    if(writePos <= tileEndClamped){
+        const int smemPos = writePos - apronStart;
+        float sum = 0;
+
+        for(int k = -GRADIENT_RADIUS; k <= GRADIENT_RADIUS; k++)
+            sum += data[smemPos + k] * d_Kernel[GRADIENT_RADIUS - k];
+
+        //d_Result[rowStart + writePos] = sum;
+        //imageStore(outputTexture, rowStart + writePos, sum);
+        imageStore(outputTexture, ivec2(writePos, rowStart), vec4(sum));
+    }
+}

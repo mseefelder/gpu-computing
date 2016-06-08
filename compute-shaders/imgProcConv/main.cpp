@@ -132,7 +132,8 @@ int main(int argc, char *argv[])
 
 	initialize();
 
-	glWindow->setTexture(bW, 1, img1.width(), img1.height());
+	//glWindow->setTexture(bW, 1, img1.width(), img1.height());
+	glWindow->gradient(bW, 1, img1.width(), img1.height());
 
 	while (!glfwWindowShouldClose(main_window))
 	{
